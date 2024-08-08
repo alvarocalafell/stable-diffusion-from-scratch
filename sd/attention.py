@@ -20,15 +20,15 @@ class SelfAttention(nn.Module):
         
         batch_size, sequence_length, d_embed = input_shape
         
-        intermim_shape = (batch_size, sequence_length, self.n_heads, self.d_head)
+        interim_shape = (batch_size, sequence_length, self.n_heads, self.d_head)
         
         # (batch_size, seq_len, dim) -> (batch_size, seq_len, dim * 3) -> 3 tensors of shape (batch_size, seq_len, dim)
         q, k ,v = self.in_proj(x).chunk(3, dim=-1)
         
         # (Batch_size, seq_len, dim) -> (Batch, seq_len, H, Dim/H) -> (Batch, H, seq_len, Dim/H)) So each head will watch all the sequence but only a part of the embedding
-        q = q.view(intermim_shape).transpose(1,2) 
-        k = k.view(intermim_shape).transpose(1,2) 
-        v = v.view(intermim_shape).transpose(1,2) 
+        q = q.view(interim_shape).transpose(1,2) 
+        k = k.view(interim_shape).transpose(1,2) 
+        v = v.view(interim_shape).transpose(1,2) 
         
         # (Batch_size, H, seq_len, seq_len)  
         weight = q @ k.transpose(-1, -2)
@@ -55,5 +55,49 @@ class SelfAttention(nn.Module):
         # (Batch_size, seq_len, dim)
         return output
         
+        
+class CrossAttention(nn.Module):
+    def __init__(self, n_heads: int, d_embed: int, d_cross: int, in_proj_bias=True, out_proj_bias=True):
+        super().__init__()
+        self.q_proj = nn.Linear(d_embed, d_embed, bias=in_proj_bias)
+        self.k_proj = nn.Linear(d_cross, d_embed, bias=in_proj_bias)
+        self.v_proj = nn.Linear(d_cross, d_embed, bias=in_proj_bias)
+        self.out_proj = nn.Linear(d_embed, d_embed, bias=out_proj_bias)
+        self.n_heads = n_heads
+        self.d_head = d_embed // n_heads
+        
+    def forward(self, x, y):
+        # x: (latent): (Batch_size, seq_len_q, dim_q)
+        # y: (latent): (Batch_size, seq_len_kv, dim_kv) = (Batch_size, 77, 768)
+        
+        input_shape = x.shape
+        batch_size, sequence_length, d_embed = input_shape
+        
+        interim_shape = (batch_size, -1, self.n_heads, self.d_head)
+        
+        #Multiply query by Wq
+        q = self.q_proj(x)
+        k = self.k_proj(y)
+        v = self.v_proj(y)
+        
+        q= q.view(interim_shape).transpose(1, 2)
+        k= k.view(interim_shape).transpose(1, 2)
+        v= v.view(interim_shape).transpose(1, 2)
+        
+        weight = q @ k.transpose(-1, -2)
+        
+        weight /= math.sqrt(self.d_head)
+        
+        weight = F.softmax(weight, dim=-1 )# Here we don't need causal mask since we are watching pixels and tokens,
+                                            # So any pixel can watch at any word
+        output = weight @ v
+        
+        output = output.transpose(1, 2).contiguous()
+        
+        output = output.view(input_shape)
+        
+        output = self.out_proj(output)
+        
+        return output
         
         
