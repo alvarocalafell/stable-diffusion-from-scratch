@@ -88,7 +88,7 @@ class CrossAttention(nn.Module):
         
         weight /= math.sqrt(self.d_head)
         
-        weight = F.softmax(weight, dim=-1 )# Here we don't need causal mask since we are watching pixels and tokens,
+        weight = F.softmax(weight, dim=-1)  # Here we don't need causal mask since we are watching pixels and tokens,
                                             # So any pixel can watch at any word
         output = weight @ v
         
