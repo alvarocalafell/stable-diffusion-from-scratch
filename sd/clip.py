@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch.nn import functional as F
 from attention import SelfAttention
 
 class CLIPEmbedding(nn.Module):
@@ -59,9 +58,10 @@ class CLIPLayer(nn.Module):
 class CLIP(nn.Module):
     
     def __init__(self) -> None:
+        super().__init__()
         self.embedding = CLIPEmbedding(49408, 768, 77) #TO-DO:Use some configuration file
                                                         #In this case parameters already fixed by pretraind model
-        self.layers = nn.Module([
+        self.layers = nn.ModuleList([
             CLIPLayer(12, 768) for i in range(12) # 12 is nº of heads in the MHA and the embedding size = 768
         ])
         

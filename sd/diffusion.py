@@ -25,10 +25,10 @@ class UNET_ResidualBlock(nn.Module):
     "In this block we are relating the time embeddings with the latent so that"
     "the putput will depend on the combination of both, not on a single noise or"
     "time step"
-    def __init__(self, in_channels:int, out_channels: int, n_time:1280):
+    def __init__(self, in_channels:int, out_channels: int, n_time=1280):
         super().__init__()
-        self.groupnorm = nn.GroupNorm(32, in_channels)
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.groupnorm_feature = nn.GroupNorm(32, in_channels)
+        self.conv_feature = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
         self.linear_time = nn.Linear(n_time, out_channels)
         
         self.groupnorm_merged = nn.GroupNorm(32, out_channels)
@@ -71,7 +71,7 @@ class UNET_AttentionBlock(nn.Module):
         channels = n_head * n_embd
         
         self.groupnorm = nn.GroupNorm(32, channels, eps=1e-6)
-        self.conv_input = nn.Conv2d(channels, channels, kernel_size=1,padding=0)
+        self.conv_input = nn.Conv2d(channels, channels, kernel_size=1, padding=0)
         
         self.layernorm_1 = nn.LayerNorm(channels)
         self.attention_1 = SelfAttention(n_head, channels, in_proj_bias=False)
@@ -99,7 +99,7 @@ class UNET_AttentionBlock(nn.Module):
         x = x.view((n, c, h * w))
         
         # (Batch_size, features,height *width) -> (Batch_size, height * width, features)
-        x = x.transpose(-1,-2)
+        x = x.transpose(-1, -2)
         
         # Normalization + Self Attention with skip connectino
         residual_short = x
@@ -111,7 +111,7 @@ class UNET_AttentionBlock(nn.Module):
         residual_short = x
         
         # Normalization + Cross Attention with skip connectino
-        x = self.layernorm_1(x)
+        x = self.layernorm_2(x)
         
         #Cross Attention
         self.attention_2(x, context)
@@ -120,7 +120,7 @@ class UNET_AttentionBlock(nn.Module):
         
         residual_short = x
         
-        #Normalization + FF with GeGLU and skip connection
+        #Normalization + FFN with GeGLU and skip connection
         x = self.layernorm_3(x)
         
         x, gate = self.linear_geglu_1(x).chunk(2, dim=-1)
@@ -141,7 +141,7 @@ class Upsample(nn.Module):
     
     def __init__(self, channels: int):
         super().__init__()
-        self.conv = nn.Conv2d(channels, kernel_size=3, padding=1)
+        self.conv = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         
     def forward(self, x):
         # (Batch_size, features, height, width) -> (Batch_size, features, height * 2, width * 2)
@@ -154,7 +154,7 @@ class SwitchSequential(nn.Sequential):
         for layer in self:
             if isinstance(layer, UNET_AttentionBlock):
                 x = layer(x, context) #Attention Block will calculate the cross attention between our latents and the prompt
-            if isinstance(layer, UNET_ResidualBlock):
+            elif isinstance(layer, UNET_ResidualBlock):
                 x = layer(x, time)
             else:
                 x = layer(x)    
@@ -165,8 +165,7 @@ class UNET(nn.Module):
     
     def __init__(self):
         super().__init__()
-        
-        self.encoders = nn.Module([
+        self.encoders = nn.ModuleList([
             
             # (Batch_size, 4, height / 8, width / 8) 
             SwitchSequential(nn.Conv2d(4, 320, kernel_size=3, padding=1)),
@@ -192,7 +191,7 @@ class UNET(nn.Module):
             # (Batch_size, 1280, height / 32, width / 32) -> (Batch_size, 1280, height / 64, width / 64) 
             SwitchSequential(nn.Conv2d(1280, 1280, kernel_size=3, stride=2, padding=1)),
             
-            SwitchSequential(UNET_ResidualBlock(128, 1280)),
+            SwitchSequential(UNET_ResidualBlock(1280, 1280)),
             
             # (Batch_size, 1280, height / 64, width / 64) -> (Batch_size, 1280, height / 64, width / 64) 
             SwitchSequential(UNET_ResidualBlock(1280, 1280))
@@ -207,7 +206,7 @@ class UNET(nn.Module):
             UNET_ResidualBlock(1280, 1280),
         )
         
-        self.decoder = nn.ModuleList([
+        self.decoders = nn.ModuleList([
             # (Batch_size, 2560, height / 64, width / 64) -> (Batch_size, 1280, height / 64, width / 64) 
             SwitchSequential(UNET_ResidualBlock(2560, 1280)),
             
@@ -221,9 +220,9 @@ class UNET(nn.Module):
             
             SwitchSequential(UNET_ResidualBlock(1920, 1280), UNET_AttentionBlock(8, 160), Upsample(1280)),
 
-            SwitchSequential(UNET_ResidualBlock(1280, 640), UNET_AttentionBlock(8, 80)),
-            
             SwitchSequential(UNET_ResidualBlock(1920, 640), UNET_AttentionBlock(8, 80)),
+            
+            SwitchSequential(UNET_ResidualBlock(1280, 640), UNET_AttentionBlock(8, 80)),
 
             SwitchSequential(UNET_ResidualBlock(960, 640), UNET_AttentionBlock(8, 80), Upsample(640)),
 
@@ -235,6 +234,25 @@ class UNET(nn.Module):
             
 
         ])
+        
+    def forward(self, x, context, time):
+        # x: (Batch_Size, 4, Height / 8, Width / 8)
+        # context: (Batch_Size, Seq_Len, Dim) 
+        # time: (1, 1280)
+
+        skip_connections = []
+        for layers in self.encoders:
+            x = layers(x, context, time)
+            skip_connections.append(x)
+
+        x = self.bottleneck(x, context, time)
+
+        for layers in self.decoders:
+            # Since we always concat with the skip connection of the encoder, the number of features increases before being sent to the decoder's layer
+            x = torch.cat((x, skip_connections.pop()), dim=1) 
+            x = layers(x, context, time)
+        
+        return x
 
 
 class UNET_OutputLayer(nn.Module):
@@ -261,9 +279,10 @@ class UNET_OutputLayer(nn.Module):
 
 class Diffusion(nn.Module):
     def __init__(self):
+        super().__init__()
         self.time_embedding = TimeEmbedding(320)
         self.unet = UNET()
-        self.final = UNET_OutputLayer(320,4)
+        self.final = UNET_OutputLayer(320, 4)
         
     def forward(self, latent: torch.Tensor, context : torch.Tensor, time: torch.Tensor):
         # latent: (Batch_size, 4, height/ 8, width / 8)

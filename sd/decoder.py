@@ -19,7 +19,7 @@ class VAE_AttentionBlock(nn.Module):
         
         # self attention between all the pixels of the image
         # (Batch_size, features, height, width) -> (Batch_size, features, height *width)
-        x = x.view(n, c, h * w)
+        x = x.view((n, c, h * w))
         
         # (Batch_size, features, height, width) -> (Batch_size, height * width, features) 
         x = x.transpose(-1, -2)
@@ -71,7 +71,7 @@ class VAE_ResidualBlock(nn.Module):
         return x + self.residual_layer(residual)# We do this because if the in_channels != out_channels,
                                                 # We need the convolution to resize the residual layer so that in_channel is mantained
 
-class VAE_Decoder(nn.Module):
+class VAE_Decoder(nn.Sequential):
     
     def __init__(self):
         super().__init__(
@@ -121,12 +121,12 @@ class VAE_Decoder(nn.Module):
             
             nn.GroupNorm(32, 128), #This will divide the 128 featues into groups of 32
             
-            nn.SiLu(),
+            nn.SiLU(),
             
             # (Batch_size, 128, height, width) -> (Batch_size, 3, height, width)
             nn.Conv2d(128, 3, kernel_size=3, padding=1)
         )
-    
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (Batch_size, 4, height / 8, width / 8)
         
