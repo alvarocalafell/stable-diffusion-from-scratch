@@ -55,6 +55,8 @@ class UNET_ResidualBlock(nn.Module):
         
         time = self.linear_time(time)
         
+        # Add width and height dimension to time. 
+        # (Batch_Size, Out_Channels, Height, Width) + (1, Out_Channels, 1, 1) -> (Batch_Size, Out_Channels, Height, Width)
         merged = feature + time.unsqueeze(-1).unsqueeze(-1)
         
         merged = self.groupnorm_merged(merged)

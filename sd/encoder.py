@@ -58,7 +58,13 @@ class VAE_Encoder(nn.Sequential):
             # (Batch_size, 512, height / 8, width / 8) -> (Batch_size, 512, height / 8, width / 8)            
             nn.SiLU(),
             
-            # (Batch_size, 512, height / 8, width / 8) -> (Batch_size, 8, height / 8, width / 8)            
+            
+            # Because the padding=1, it means the width and height will increase by 2
+            # Out_Height = In_Height + Padding_Top + Padding_Bottom
+            # Out_Width = In_Width + Padding_Left + Padding_Right
+            # Since padding = 1 means Padding_Top = Padding_Bottom = Padding_Left = Padding_Right = 1,
+            # Since the Out_Width = In_Width + 2 (same for Out_Height), it will compensate for the Kernel size of 3
+            # (Batch_Size, 512, Height / 8, Width / 8) -> (Batch_Size, 8, Height / 8, Width / 8). 
             nn.Conv2d(512, 8, kernel_size=3, padding=1),
             
             # (Batch_size, 8, height / 8, width / 8) -> (Batch_size, 8, height / 8, width / 8)            
@@ -70,8 +76,9 @@ class VAE_Encoder(nn.Sequential):
         #noise: (Batch_size, Out_channels, height / 8, width / 8)
         
         for module in self:
-            if getattr(module, 'stride', None) == (2,2):
+            if getattr(module, 'stride', None) == (2, 2):
                 # (Padding_left, Padding_right, Padding_top, Padding_bottom )
+                # Pad with zeros on the right and bottom.
                 x = F.pad(x, (0, 1, 0, 1)) #Apply asymetrical padding only on convolutions with stride = 2
             x = module(x)
             

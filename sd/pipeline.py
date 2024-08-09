@@ -25,7 +25,7 @@ def generate(
     tokenizer=None,
 ):
     with torch.no_grad():
-        if not (0 < strength <= 1):
+        if not 0 < strength <= 1:
             raise ValueError("Strength mus be bewteen 0 and 1")
         if idle_device:
             to_idle = lambda x: x.to(idle_device)  # noqa: E731

@@ -7,7 +7,7 @@ class CLIPEmbedding(nn.Module):
         super().__init__()
         
         self.token_embedding = nn.Embedding(n_vocab, n_embd)
-        self.position_embedding = nn.Parameter(torch.zeros(n_tokens, n_embd))
+        self.position_embedding = nn.Parameter(torch.zeros((n_tokens, n_embd)))
         
     def forward(self, tokens):
         # (Batch_size, seq_len) -> (Batch_size, seq_len, dim)

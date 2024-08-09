@@ -15,6 +15,9 @@ class VAE_AttentionBlock(nn.Module):
         
         residual = x 
         
+        # (Batch_Size, Features, Height, Width) -> (Batch_Size, Features, Height, Width) 
+        x = self.groupnorm(x)
+
         n, c, h, w = x.shape
         
         # self attention between all the pixels of the image
@@ -130,7 +133,7 @@ class VAE_Decoder(nn.Sequential):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (Batch_size, 4, height / 8, width / 8)
         
-        x/= 0.18215
+        x /= 0.18215
         
         for module in self:
             x = module(x)
