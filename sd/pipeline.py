@@ -11,7 +11,7 @@ LATENTS_HEIGHT = HEIGHT // 8
 
 def generate(
     prompt: str,
-    uncond_prompt: str,
+    uncond_prompt=None,
     input_image=None,
     strength=0.8,
     do_cfg=True,
@@ -76,7 +76,7 @@ def generate(
         latents_shape = (1, 4, LATENTS_HEIGHT, LATENTS_WIDTH)
         
         if input_image:
-            encoder = models['encoder']
+            encoder = models["encoder"]
             encoder.to(device)
             
             input_image_tensor = input_image.resize((WIDTH, HEIGHT))
@@ -109,7 +109,7 @@ def generate(
         # model to remove noise according to particualr timesteps which are defined
         # by how many inference steps we want
         
-        diffusion = models['diffusion']
+        diffusion = models["diffusion"]
         diffusion.to(device)
         
         timesteps = tqdm(sampler.timesteps)
