@@ -22,9 +22,11 @@ class TimeEmbedding(nn.Module):
         return x
 
 class UNET_ResidualBlock(nn.Module):
-    "In this block we are relating the time embeddings with the latent so that"
-    "the putput will depend on the combination of both, not on a single noise or"
-    "time step"
+    """
+    In this block we are relating the time embeddings with the latent so that
+    the putput will depend on the combination of both, not on a single noise or
+    time step
+    """
     def __init__(self, in_channels:int, out_channels: int, n_time=1280):
         super().__init__()
         self.groupnorm_feature = nn.GroupNorm(32, in_channels)
@@ -43,7 +45,7 @@ class UNET_ResidualBlock(nn.Module):
         # feature: (Batch_size, In_channels, height, width)
         # time (1, 1280)
         
-        residual = feature
+        residue = feature
         
         feature = self.groupnorm_feature(feature)
         
@@ -65,7 +67,7 @@ class UNET_ResidualBlock(nn.Module):
         
         merged = self.conv_merged(merged)
         
-        return merged + self.residual_layer(residual) 
+        return merged + self.residual_layer(residue) 
         
 class UNET_AttentionBlock(nn.Module):
     def __init__(self, n_head: int, n_embd: int, d_context=768):
@@ -89,7 +91,7 @@ class UNET_AttentionBlock(nn.Module):
         # x: (Batch_size, features,height, width)
         # context: (Batch_size, seq_len, dim)
         
-        residual_long = x
+        residue_long = x
         
         x = self.groupnorm(x)
         
@@ -104,13 +106,15 @@ class UNET_AttentionBlock(nn.Module):
         x = x.transpose(-1, -2)
         
         # Normalization + Self Attention with skip connectino
-        residual_short = x
+        residue_short = x
         
         x = self.layernorm_1(x)
-        self.attention_1(x)
-        x += residual_short
         
-        residual_short = x
+        x = self.attention_1(x)
+        
+        x += residue_short
+        
+        residue_short = x
         
         # Normalization + Cross Attention with skip connectino
         x = self.layernorm_2(x)
@@ -118,26 +122,27 @@ class UNET_AttentionBlock(nn.Module):
         #Cross Attention
         self.attention_2(x, context)
         
-        x += residual_short
+        x += residue_short
         
-        residual_short = x
+        residue_short = x
         
         #Normalization + FFN with GeGLU and skip connection
         x = self.layernorm_3(x)
         
         x, gate = self.linear_geglu_1(x).chunk(2, dim=-1)
+        
         x = x * F.gelu(gate)
         
         x = self.linear_geglu_2(x)
         
-        x += residual_short
+        x += residue_short
         
          # (Batch_size, height * width, features) -> (Batch_size, features,height *width) 
         x = x.transpose(-1, -2)
         
         x = x.view((n, c, h, w))
         
-        return self.conv_output(x) + residual_long
+        return self.conv_output(x) + residue_long
 
 class Upsample(nn.Module):
     

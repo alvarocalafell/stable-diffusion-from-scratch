@@ -13,7 +13,7 @@ class VAE_AttentionBlock(nn.Module):
     def forward(self, x:torch.Tensor) -> torch.Tensor:
         # x: (Batch_size, features, height, width)
         
-        residual = x 
+        residue = x 
         
         # (Batch_Size, Features, Height, Width) -> (Batch_Size, Features, Height, Width) 
         x = self.groupnorm(x)
@@ -36,7 +36,7 @@ class VAE_AttentionBlock(nn.Module):
         #(Batch_size, features, height * width)  -> (Batch_size, features, height, width) 
         x = x.view((n, c, h, w))
         
-        x += residual
+        x += residue
         
         return x
         
@@ -57,7 +57,7 @@ class VAE_ResidualBlock(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (Batch_size, in_channels, height, width)
         
-        residual = x
+        residue = x
         
         x = self.groupnorm_1(x)
         
@@ -69,9 +69,9 @@ class VAE_ResidualBlock(nn.Module):
         
         x = F.silu(x)
         
-        x= self.conv_2(x)
+        x = self.conv_2(x)
         
-        return x + self.residual_layer(residual)# We do this because if the in_channels != out_channels,
+        return x + self.residual_layer(residue)# We do this because if the in_channels != out_channels,
                                                 # We need the convolution to resize the residual layer so that in_channel is mantained
 
 class VAE_Decoder(nn.Sequential):

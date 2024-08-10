@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 from attention import SelfAttention
 
 class CLIPEmbedding(nn.Module):
@@ -20,7 +21,7 @@ class CLIPEmbedding(nn.Module):
 class CLIPLayer(nn.Module):
     
     
-    def __init__(self, n_head: int, n_embd: int ) -> None:
+    def __init__(self, n_head: int, n_embd: int ):
         super().__init__()
         
         self.layernorm_1 = nn.LayerNorm(n_embd)
@@ -33,22 +34,22 @@ class CLIPLayer(nn.Module):
         
         # (Batch_size, seq_len, dim)
         
-        residual = x
+        residue = x
         
         #Self Attention
         
         x = self.layernorm_1(x)
         x= self.attention(x, causal_mask=True) 
-        x += residual
+        x += residue
         
         #FeedForward Layer
         
-        residual = x
+        residue = x
         x = self.layernorm_2(x)
         x = self.linear_1(x) 
         x = x * torch.sigmoid(1.702 * x) #QuickGELU activation function, which in practice is demonstrated to work better
         x= self.linear_2(x)
-        x +=residual
+        x += residue
         
         return x 
         
@@ -57,7 +58,7 @@ class CLIPLayer(nn.Module):
 
 class CLIP(nn.Module):
     
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
         self.embedding = CLIPEmbedding(49408, 768, 77) #TO-DO:Use some configuration file
                                                         #In this case parameters already fixed by pretraind model

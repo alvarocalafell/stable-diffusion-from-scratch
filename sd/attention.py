@@ -26,9 +26,9 @@ class SelfAttention(nn.Module):
         q, k ,v = self.in_proj(x).chunk(3, dim=-1)
         
         # (Batch_size, seq_len, dim) -> (Batch, seq_len, H, Dim/H) -> (Batch, H, seq_len, Dim/H)) So each head will watch all the sequence but only a part of the embedding
-        q = q.view(interim_shape).transpose(1,2) 
-        k = k.view(interim_shape).transpose(1,2) 
-        v = v.view(interim_shape).transpose(1,2) 
+        q = q.view(interim_shape).transpose(1, 2) 
+        k = k.view(interim_shape).transpose(1, 2) 
+        v = v.view(interim_shape).transpose(1, 2) 
         
         # (Batch_size, H, seq_len, seq_len)  
         weight = q @ k.transpose(-1, -2)
@@ -80,9 +80,9 @@ class CrossAttention(nn.Module):
         k = self.k_proj(y)
         v = self.v_proj(y)
         
-        q= q.view(interim_shape).transpose(1, 2)
-        k= k.view(interim_shape).transpose(1, 2)
-        v= v.view(interim_shape).transpose(1, 2)
+        q = q.view(interim_shape).transpose(1, 2)
+        k = k.view(interim_shape).transpose(1, 2)
+        v = v.view(interim_shape).transpose(1, 2)
         
         weight = q @ k.transpose(-1, -2)
         
